@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/* Cab-friendly: dark by default (night driving), high contrast, big targets. */
+:root {
+  --bg: #0e1116;
+  --panel: #161b22;
+  --tile: #1d242e;
+  --ink: #eef2f6;
+  --muted: #9aa6b4;
+  --line: rgb(255 255 255 / 0.09);
+  --accent: #ffb020;
+  --accent-ink: #1a1200;
+  --good: #3ccf91;
+  --bad: #ff6b5e;
+  --blue: #5aa9ff;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f1ea;
+    --panel: #ffffff;
+    --tile: #f7f5f0;
+    --ink: #15181d;
+    --muted: #5b6470;
+    --line: rgb(0 0 0 / 0.09);
+    --accent: #e08a00;
+    --accent-ink: #ffffff;
+    --good: #12875a;
+    --bad: #c8382b;
+    --blue: #1f6fd1;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-tile: var(--tile);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --color-blue: var(--blue);
+  --font-sans: var(--font-sans), system-ui, sans-serif;
+  --font-mono: var(--font-mono), ui-monospace, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgb(255 176 32 / 0.55); }
+  100% { box-shadow: 0 0 0 28px rgb(255 176 32 / 0); }
+}
+.listening { animation: pulse-ring 1.2s ease-out infinite; }

@@ -16,6 +16,16 @@ The name: the **dock** is where drivers wait unpaid, and a **tab** is the runnin
 
 An AI agent plans each request and calls the tools; amounts and times come from code, never from the model. A dispatcher board shows each load's detention clock, invoice and lumper payout, refreshed from PayPal.
 
+## How it meets the judging criteria
+
+| Criterion | Where to see it |
+|---|---|
+| Technical | PayPal Invoicing v2 (create, send, get, list, reminder), Payouts for the lumper, transaction search; tool calls are shown live in the driver's step trace; amounts come from code, not the model |
+| Design | One driver screen (voice first, big mic button) and one dispatcher board; no settings pages |
+| Impact | Drivers wait unpaid at docks (detention). The board shows money billed and money recovered per load |
+| Idea | A driver speaks a detention claim and it becomes a sent PayPal invoice, with the dock timeline as evidence |
+| Presentation | A video under 3 minutes covering the problem, the three flows live, and the PayPal sandbox showing the invoice and payout |
+
 ## Run it locally
 
 Requirements: Node.js 22, a PayPal developer sandbox app (Invoicing enabled) and an API key for the AI model.

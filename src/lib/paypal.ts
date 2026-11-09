@@ -10,9 +10,10 @@ if (!BASE.includes("sandbox")) throw new Error("DockTab only runs against the Pa
 
 export const paypalReady = () => Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
 
-// Toolkit tools the agent may call directly. Creating and sending invoices goes
+// Toolkit tools the agent may call directly (transactions come from the PayPal
+// Server SDK instead, see paypal-sdk.ts). Creating and sending invoices goes
 // through DockTab's bill_detention tool instead, so amounts come from code.
-const DIRECT = ["list_invoices", "get_invoice", "send_invoice_reminder", "list_transactions"] as const;
+const DIRECT = ["list_invoices", "get_invoice", "send_invoice_reminder"] as const;
 
 // The toolkit fetches one OAuth token and keeps it for its whole life, so a
 // long-running server starts getting 401s once PayPal stops accepting it.
@@ -32,14 +33,13 @@ const toolkit = () => {
     configuration: {
       actions: {
         invoices: { create: true, send: true, get: true, list: true, sendReminder: true },
-        transactions: { list: true },
       },
       context: { sandbox: true },
     },
   }));
 };
 
-// Some toolkit schemas carry defaults computed at load time (list_transactions
+// Some toolkit schemas can carry defaults computed at load time (list_transactions
 // defaults to "now"); drop them so the tool list is byte-identical across
 // requests and the prompt cache holds.
 function stripDefaults(schema: unknown): unknown {

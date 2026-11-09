@@ -33,7 +33,7 @@ const TOOL_LABEL: Record<string, string> = {
   list_invoices: "PayPal invoices",
   get_invoice: "PayPal invoice status",
   send_invoice_reminder: "PayPal reminder",
-  list_transactions: "PayPal transactions",
+  paypal_activity: "PayPal transactions",
 };
 
 // Minimal Web Speech API typing (Chrome and Safari prefix it).

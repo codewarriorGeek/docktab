@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { allLoads, detention, findLoad, hhmm } from "./loads";
 import { isToolkitTool, payoutStatus, runToolkit, runToolkitJson, sendPayout, toolkitTools } from "./paypal";
+import { recentActivity } from "./paypal-sdk";
 
 // A small, fast model by default (good enough for short tool-calling turns
 // spoken by a driver); set AI_MODEL_NAME to a larger model for more judgement.
@@ -19,7 +20,7 @@ const SYSTEM = `You are DockTab, a hands-free money assistant for an owner-opera
 What you can do:
 - Bill detention: call bill_detention with the load id. It works out the billable time from the truck's arrival, the appointment and the free time in the rate confirmation, then creates and sends a PayPal invoice to the broker. Never invent amounts or times; they come from the tool.
 - Pay a lumper: call pay_lumper with the load id and the amount the driver says. It sends a PayPal payout. Only pay when the driver clearly asks and states an amount.
-- Answer money questions: use list_invoices, get_invoice, list_transactions and loads to say what is paid, sent or overdue. Use send_invoice_reminder when the driver asks to chase a broker.
+- Answer money questions: use list_invoices, get_invoice and loads to say what is paid, sent or overdue, and paypal_activity to confirm what money actually moved in or out of the PayPal account. paypal_activity can lag a few hours behind; if a payment is not there yet, say so and give the time the data is from. Use send_invoice_reminder when the driver asks to chase a broker.
 - loads lists the driver's loads and where the truck is; call it first when the driver does not name a load.
 
 How to answer:
@@ -57,6 +58,18 @@ const OWN_TOOLS: Anthropic.Beta.BetaTool[] = [
         amount: { type: "string", description: "Amount in US dollars, for example 150.00" },
       },
       required: ["load_id", "amount"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    name: "paypal_activity",
+    description:
+      "Money that actually moved in and out of the carrier's PayPal account (payments received, payouts sent) over the last N days, from PayPal Transaction Search. The data can lag a few hours; the result says when it was last refreshed.",
+    input_schema: {
+      type: "object",
+      properties: { days: { type: "integer", description: "How many days back to look, 1 to 31" } },
+      required: ["days"],
       additionalProperties: false,
     },
     strict: true,
@@ -196,6 +209,13 @@ async function runTool(name: string, input: Record<string, unknown>): Promise<{ 
       return billDetention(String(input.load_id));
     case "pay_lumper":
       return payLumper(String(input.load_id), String(input.amount));
+    case "paypal_activity": {
+      const { items, refreshedAt } = await recentActivity(Number(input.days));
+      return {
+        text: json({ refreshed_at: refreshedAt, count: items.length, items }),
+        summary: `PayPal activity: ${items.length} payments`,
+      };
+    }
     default: {
       if (!isToolkitTool(name)) return { text: json({ error: `unknown tool ${name}` }), summary: "Unknown tool" };
       const text = await runToolkit(name, input);

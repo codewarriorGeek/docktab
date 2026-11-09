@@ -12,6 +12,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",
     "@paypal/agent-toolkit": "^1.11.0",
+    "@paypal/paypal-server-sdk": "2.5.0",
     "next": "16.4.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",

@@ -120,8 +120,31 @@ export async function billDetention(loadId: string): Promise<{ text: string; sum
 // The Indianapolis load was billed yesterday and is still unpaid, so "has
 // Prairie paid?" has a real answer and a reminder to send. Once per process.
 let seeding: Promise<unknown> | null = null;
+// Reuse a live invoice for the demo load if PayPal already has one, so a
+// restart does not create a duplicate invoice in the sandbox.
+async function existingInvoice(loadId: string): Promise<{ id: string; status: string } | null> {
+  const res = await runToolkitJson<{
+    invoices?: { id: string; status: string; detail?: { reference?: string } }[];
+    items?: { id: string; status: string; detail?: { reference?: string } }[];
+  }>("list_invoices", { page_size: 100 }).catch(() => null);
+  const rows = res?.invoices ?? res?.items ?? [];
+  const hit = rows.find((i) => i.detail?.reference === loadId && i.status !== "CANCELLED");
+  return hit ? { id: hit.id, status: hit.status } : null;
+}
+
 export const seedDemo = () =>
-  (seeding ??= billDetention("DT-1039").catch((err) => {
+  (seeding ??= (async () => {
+    const load = findLoad("DT-1039");
+    if (load && !load.invoiceId) {
+      const found = await existingInvoice(load.id);
+      if (found) {
+        load.invoiceId = found.id;
+        load.invoiceStatus = found.status;
+        return;
+      }
+    }
+    await billDetention("DT-1039");
+  })().catch((err) => {
     seeding = null;
     console.error("demo seed failed", err);
   }));

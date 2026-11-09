@@ -18,8 +18,11 @@ export async function GET() {
     allLoads().map(async (l) => {
       if (fresh) return { ...l, brokerEmail: undefined, detention: detention(l) };
       if (l.invoiceId) {
-        const inv = await runToolkitJson<{ status?: string }>("get_invoice", { invoice_id: l.invoiceId }).catch(() => null);
-        if (inv?.status) l.invoiceStatus = inv.status;
+        // Error payloads also carry a numeric "status" (the HTTP code), so only
+        // a text status is an invoice status.
+        const inv = await runToolkitJson<{ status?: unknown }>("get_invoice", { invoice_id: l.invoiceId }).catch(() => null);
+        if (typeof inv?.status === "string") l.invoiceStatus = inv.status;
+        else console.warn(`board: no invoice status for ${l.id}`);
       }
       if (l.lumper && l.lumper.status !== "SUCCESS") {
         l.lumper.status = await payoutStatus(l.lumper.batchId).catch(() => l.lumper!.status);

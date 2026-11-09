@@ -366,13 +366,13 @@ function LoadCard({ load: l }: { load: Load }) {
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         {l.invoiceId ? (
-          <Badge tone={l.invoiceStatus === "PAID" ? "good" : "accent"}>Invoice {l.invoiceStatus?.toLowerCase()}</Badge>
+          <Badge tone={l.invoiceStatus === "PAID" ? "good" : "accent"}>Invoice {String(l.invoiceStatus ?? "").toLowerCase()}</Badge>
         ) : (
           d && d.billableMinutes > 0 && <Badge tone="muted">Not billed yet</Badge>
         )}
         {l.lumper && (
           <Badge tone={l.lumper.status === "SUCCESS" ? "good" : "accent"}>
-            Lumper {money(l.lumper.amount)} {l.lumper.status.toLowerCase()}
+            Lumper {money(l.lumper.amount)} {String(l.lumper.status ?? "").toLowerCase()}
           </Badge>
         )}
       </div>

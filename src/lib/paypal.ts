@@ -14,9 +14,19 @@ export const paypalReady = () => Boolean(process.env.PAYPAL_CLIENT_ID && process
 // through DockTab's bill_detention tool instead, so amounts come from code.
 const DIRECT = ["list_invoices", "get_invoice", "send_invoice_reminder", "list_transactions"] as const;
 
+// The toolkit fetches one OAuth token and keeps it for its whole life, so a
+// long-running server starts getting 401s once PayPal stops accepting it.
+// Rebuild it (which fetches a fresh token) every 30 minutes, and at once on a 401.
+const KIT_TTL_MS = 30 * 60_000;
 let kit: PayPalAgentToolkit | null = null;
-const toolkit = () =>
-  (kit ??= new PayPalAgentToolkit({
+let kitBorn = 0;
+const resetToolkit = () => {
+  kit = null;
+};
+const toolkit = () => {
+  if (kit && Date.now() - kitBorn > KIT_TTL_MS) kit = null;
+  if (!kit) kitBorn = Date.now();
+  return (kit ??= new PayPalAgentToolkit({
     clientId: process.env.PAYPAL_CLIENT_ID!,
     clientSecret: process.env.PAYPAL_CLIENT_SECRET!,
     configuration: {
@@ -27,6 +37,7 @@ const toolkit = () =>
       context: { sandbox: true },
     },
   }));
+};
 
 // Some toolkit schemas carry defaults computed at load time (list_transactions
 // defaults to "now"); drop them so the tool list is byte-identical across
@@ -56,14 +67,27 @@ export function toolkitTools() {
 
 export const isToolkitTool = (name: string) => (DIRECT as readonly string[]).includes(name);
 
-// Runs one toolkit tool and returns its JSON text.
-export async function runToolkit(name: string, input: unknown): Promise<string> {
+async function callToolkit(name: string, input: unknown): Promise<string> {
   const result = await toolkit().handleToolCall({
     id: crypto.randomUUID(),
     type: "function",
     function: { name, arguments: JSON.stringify(input ?? {}) },
   });
   return typeof result.content === "string" ? result.content : JSON.stringify(result.content);
+}
+
+// A rejected token comes back as an error payload, not an exception.
+const isAuthFailure = (text: string) =>
+  /"status"\s*:\s*401\b|AUTHENTICATION_FAILURE|invalid_token|\b401\b.*unauthori[sz]ed/i.test(text);
+
+// Runs one toolkit tool and returns its JSON text. On a 401 it rebuilds the
+// toolkit with a fresh token and tries once more.
+export async function runToolkit(name: string, input: unknown): Promise<string> {
+  const text = await callToolkit(name, input);
+  if (!isAuthFailure(text)) return text;
+  console.warn(`paypal: ${name} got 401, refreshing the token`);
+  resetToolkit();
+  return callToolkit(name, input);
 }
 
 export async function runToolkitJson<T>(name: string, input: unknown): Promise<T> {

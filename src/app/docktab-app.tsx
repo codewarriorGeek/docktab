@@ -69,7 +69,9 @@ export default function DockTabApp() {
   const recRef = useRef<Recognition | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => setCanListen(speechCtor() !== null), []);
+  useEffect(() => {
+    setCanListen(speechCtor() !== null);
+  }, []);
 
   const refreshBoard = useCallback(async () => {
     const res = await fetch("/api/board", { cache: "no-store" }).catch(() => null);
@@ -82,7 +84,11 @@ export default function DockTabApp() {
     return () => clearInterval(t);
   }, [refreshBoard]);
 
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), [turns, live]);
+  // Block body on purpose: newer Chrome returns a Promise from scrollIntoView,
+  // and React would call a returned value as the effect's clean-up and crash.
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [turns, live]);
 
   const say = useCallback(
     (text: string) => {

@@ -1,6 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { allLoads, detention, findLoad, hhmm } from "./loads";
+import { allLoads, demoGeneration, detention, findLoad, hhmm, markChanged } from "./loads";
 import { isToolkitTool, payoutStatus, runToolkit, runToolkitJson, sendPayout, toolkitTools } from "./paypal";
 import { recentActivity } from "./paypal-sdk";
 
@@ -18,7 +18,7 @@ const claude = () => (client ??= new Anthropic());
 const SYSTEM = `You are DockTab, a hands-free money assistant for an owner-operator truck driver. The driver talks to you while working, often at a dock. Everything runs in the PayPal sandbox.
 
 What you can do:
-- Bill detention: call bill_detention with the load id. It works out the billable time from the truck's arrival, the appointment and the free time in the rate confirmation, then creates and sends a PayPal invoice to the broker. Never invent amounts or times; they come from the tool.
+- Bill detention: call bill_detention with the load id. It works out the billable time from the truck's arrival, the appointment and the free time in the rate confirmation, then creates and sends a PayPal invoice to the broker. Never invent amounts or times; they come from the tool. When the driver asks to bill, call it right away without asking for confirmation, even if the truck is still at the dock: the invoice covers detention up to now.
 - Pay a lumper: call pay_lumper with the load id and the amount the driver says. It sends a PayPal payout. Only pay when the driver clearly asks and states an amount.
 - Answer money questions: use list_invoices, get_invoice and loads to say what is paid, sent or overdue, and paypal_activity to confirm what money actually moved in or out of the PayPal account. paypal_activity can lag a few hours behind; if a payment is not there yet, say so and give the time the data is from. Use send_invoice_reminder when the driver asks to chase a broker.
 - loads lists the driver's loads and where the truck is; call it first when the driver does not name a load.
@@ -26,6 +26,7 @@ What you can do:
 How to answer:
 - The driver is listening, not reading. Reply in one or two short sentences with the key number first, for example "Sent. Lakeshore owes you $197.25 for 2.6 hours at Columbus."
 - Say money as dollars and cents and times as hours and minutes. Do not read out ids unless asked.
+- Answer only what the driver asked about. Do not bring up other loads, payouts or invoices unless the driver asks.
 - If something fails, say what failed in plain words and what the driver can do.
 - Earlier replies may end with a [Looked up: ...] note listing the calls made for them. Trust those results; never add such a note yourself.
 - If the request is not about the driver's loads or money, say briefly that you only handle loads, detention, lumpers and payments.`;
@@ -124,6 +125,7 @@ export async function billDetention(loadId: string): Promise<{ text: string; sum
   await runToolkit("send_invoice", { invoice_id: id, send_to_recipient: true });
   load.invoiceId = id;
   load.invoiceStatus = "SENT";
+  markChanged();
   return {
     text: json({ invoice_id: id, status: "SENT", amount: d.amount, broker: load.broker, detention: d, timeline }),
     summary: `Invoice ${id}: $${d.amount} to ${load.broker} for ${d.billableHours} h`,
@@ -145,8 +147,15 @@ async function existingInvoice(loadId: string): Promise<{ id: string; status: st
   return hit ? { id: hit.id, status: hit.status } : null;
 }
 
-export const seedDemo = () =>
-  (seeding ??= (async () => {
+// Seeded once per demo session (see loads.ts).
+let seededGeneration = -1;
+export const seedDemo = () => {
+  const g = demoGeneration();
+  if (g !== seededGeneration) {
+    seededGeneration = g;
+    seeding = null;
+  }
+  return (seeding ??= (async () => {
     const load = findLoad("DT-1039");
     if (load && !load.invoiceId) {
       const found = await existingInvoice(load.id);
@@ -161,6 +170,7 @@ export const seedDemo = () =>
     seeding = null;
     console.error("demo seed failed", err);
   }));
+};
 
 async function payLumper(loadId: string, amount: string): Promise<{ text: string; summary: string }> {
   const load = findLoad(loadId);
@@ -172,6 +182,7 @@ async function payLumper(loadId: string, amount: string): Promise<{ text: string
   const lumper = process.env.PAYPAL_LUMPER_EMAIL ?? process.env.PAYPAL_BROKER_EMAIL ?? "";
   const payout = await sendPayout(lumper, value.toFixed(2), `Lumper fee, load ${load.id}, ${load.receiver}`);
   load.lumper = { amount: value.toFixed(2), batchId: payout.batchId, status: payout.status, at: new Date().toISOString() };
+  markChanged();
   return {
     text: json({ paid: value.toFixed(2), payout_batch_id: payout.batchId, status: payout.status, load: load.id }),
     summary: `Payout $${value.toFixed(2)} for ${load.id} (${payout.status})`,

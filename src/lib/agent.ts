@@ -34,13 +34,14 @@ How to answer:
 - Say money as dollars and cents and times as hours and minutes. Do not read out ids unless asked.
 - Answer only what the driver asked about. Do not bring up other loads, payouts or invoices unless the driver asks.
 - If something fails, say what failed in plain words and what the driver can do.
-- Earlier replies may end with a [Looked up: ...] note listing the calls made for them. Trust those results; never add such a note yourself.
+- Earlier replies may end with a [Looked up: ...] note listing the calls made for them. Their full tool results are not repeated to you, so trust those earlier replies: never re-check, doubt or correct an earlier answer unless the driver asks. Never add such a note yourself.
 - If the request is not about the driver's loads or money, say briefly that you only handle loads, detention, lumpers and payments.`;
 
 const OWN_TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: "loads",
-    description: "List the driver's loads with broker, receiver, appointment, arrival, release and detention so far.",
+    description:
+      "List the driver's loads with broker, receiver, appointment, arrival, release and detention so far, plus each load's invoice and lumper payout with their status read live from PayPal.",
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -372,13 +373,18 @@ async function payLumper(loadId: string, amount: string, payAgain: boolean): Pro
 }
 
 async function loadsSnapshot(): Promise<{ text: string; summary: string }> {
-  // Refresh payout states that were still pending.
+  // Read invoice and pending payout states from PayPal, so "has the broker
+  // paid?" is answered from PayPal, not from what DockTab last saw.
   await Promise.all(
-    allLoads()
-      .filter((l) => l.lumper && l.lumper.status !== "SUCCESS")
-      .map(async (l) => {
-        l.lumper!.status = await payoutStatus(l.lumper!.batchId).catch(() => l.lumper!.status);
-      }),
+    allLoads().map(async (l) => {
+      if (l.invoiceId) {
+        const inv = await runToolkitJson<{ status?: unknown }>("get_invoice", { invoice_id: l.invoiceId }).catch(() => null);
+        if (typeof inv?.status === "string") l.invoiceStatus = inv.status;
+      }
+      if (l.lumper && l.lumper.status !== "SUCCESS") {
+        l.lumper.status = await payoutStatus(l.lumper.batchId).catch(() => l.lumper!.status);
+      }
+    }),
   );
   const rows = allLoads().map((l) => ({
     id: l.id,
@@ -393,7 +399,11 @@ async function loadsSnapshot(): Promise<{ text: string; summary: string }> {
       : null,
     lumper: l.lumper ?? null,
   }));
-  return { text: json({ now: new Date().toISOString(), loads: rows }), summary: `${rows.length} loads` };
+  const live = rows.filter((r) => r.invoice || r.lumper).length;
+  return {
+    text: json({ now: new Date().toISOString(), loads: rows }),
+    summary: live ? `${rows.length} loads, invoice and payout status from PayPal` : `${rows.length} loads`,
+  };
 }
 
 async function runTool(name: string, input: Record<string, unknown>): Promise<{ text: string; summary: string }> {

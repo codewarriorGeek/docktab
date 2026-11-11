@@ -12,7 +12,9 @@ export const paypalReady = () => Boolean(process.env.PAYPAL_CLIENT_ID && process
 
 // Toolkit tools the agent may call directly (transactions come from the PayPal
 // Server SDK instead, see paypal-sdk.ts). Creating and sending invoices goes
-// through DockTab's bill_detention tool instead, so amounts come from code.
+// through DockTab's bill_detention tool instead, so amounts come from code, and
+// cancelling and recording outside payments go through cancel_invoice and
+// record_payment, which check the invoice first.
 const DIRECT = ["list_invoices", "get_invoice", "send_invoice_reminder"] as const;
 
 // The toolkit fetches one OAuth token and keeps it for its whole life, so a
@@ -32,7 +34,7 @@ const toolkit = () => {
     clientSecret: process.env.PAYPAL_CLIENT_SECRET!,
     configuration: {
       actions: {
-        invoices: { create: true, send: true, get: true, list: true, sendReminder: true },
+        invoices: { create: true, send: true, get: true, list: true, sendReminder: true, cancel: true, recordPayment: true },
       },
       context: { sandbox: true },
     },

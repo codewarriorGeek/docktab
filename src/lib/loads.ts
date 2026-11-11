@@ -16,6 +16,8 @@ export type Load = {
   ratePerHour: number;
   invoiceId?: string;
   invoiceStatus?: string;
+  invoiceAmount?: string; // fixed when billed; the detention clock keeps running
+  invoiceHours?: string;
   lumper?: { amount: string; batchId: string; status: string; at: string };
 };
 

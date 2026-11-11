@@ -17,6 +17,7 @@ type Load = {
   detention: Detention | null;
   invoiceId?: string;
   invoiceStatus?: string;
+  invoiceAmount?: string;
   lumper?: { amount: string; status: string };
 };
 
@@ -33,6 +34,8 @@ const TOOL_LABEL: Record<string, string> = {
   list_invoices: "PayPal invoices",
   get_invoice: "PayPal invoice status",
   send_invoice_reminder: "PayPal reminder",
+  cancel_invoice: "PayPal invoice cancelled",
+  record_payment: "PayPal payment recorded",
   paypal_activity: "PayPal transactions",
 };
 
@@ -372,7 +375,9 @@ function LoadCard({ load: l }: { load: Load }) {
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         {l.invoiceId ? (
-          <Badge tone={l.invoiceStatus === "PAID" ? "good" : "accent"}>Invoice {String(l.invoiceStatus ?? "").toLowerCase()}</Badge>
+          <Badge tone={l.invoiceStatus === "PAID" || l.invoiceStatus === "MARKED_AS_PAID" ? "good" : "accent"}>Invoice {String(l.invoiceStatus ?? "").toLowerCase().replaceAll("_", " ")}
+            {l.invoiceAmount ? ` ${money(l.invoiceAmount)}` : ""}
+          </Badge>
         ) : (
           d && d.billableMinutes > 0 && <Badge tone="muted">Not billed yet</Badge>
         )}

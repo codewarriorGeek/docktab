@@ -4,7 +4,7 @@ import { allow } from "@/lib/rate-limit";
 
 // Streams newline-delimited JSON so the driver sees each PayPal call as it happens:
 //   {"type":"step","tool":"bill_detention","ok":true,"summary":"..."}
-//   {"type":"done","reply":"...","steps":[...],"usage":{...},"model":"..."}
+//   {"type":"done","reply":"...","steps":[...],"ms":1234}
 //   {"type":"error","error":"..."}
 const Request = z.object({
   message: z.string().trim().min(1).max(500),
@@ -35,7 +35,8 @@ export async function POST(request: Request) {
       try {
         const result = await ask(history, message, (step) => send({ type: "step", ...step }), request.signal);
         console.log("ask", { model: result.model, ms: Date.now() - started, ...result.usage });
-        send({ type: "done", ...result, ms: Date.now() - started });
+        // Model name and token usage stay in the server log, not in the response.
+        send({ type: "done", reply: result.reply, steps: result.steps, ms: Date.now() - started });
       } catch (err) {
         console.error("ask failed", err);
         send({ type: "error", error: "Something went wrong talking to PayPal or the AI service. Please try again." });

@@ -6,13 +6,13 @@ import { recentActivity } from "./paypal-sdk";
 
 // A small, fast model by default (good enough for short tool-calling turns
 // spoken by a driver); set AI_MODEL_NAME to a larger model for more judgement.
-const MODEL = process.env.AI_MODEL_NAME ?? "claude-haiku-5-5";
-const EFFORT = (process.env.AI_MODEL_EFFORT ?? "low") as "low" | "medium" | "high";
+const MODEL = process.env.AI_MODEL_NAME || "claude-haiku-5-5";
+const EFFORT = (process.env.AI_MODEL_EFFORT || "low") as "low" | "medium" | "high";
 const MAX_ROUNDS = 8;
 const MAX_LUMPER = 500; // a demo guard, not a business rule
 
 let client: Anthropic | null = null;
-const claude = () => (client ??= new Anthropic());
+const ai = () => (client ??= new Anthropic({ apiKey: process.env.AI_SERVICE_API_KEY }));
 
 // Fixed text: no dates, ids or user data, so the cached prefix never changes.
 const SYSTEM = `You are DockTab, a hands-free money assistant for an owner-operator truck driver. The driver talks to you while working, often at a dock. Everything runs in the PayPal sandbox.
@@ -257,7 +257,7 @@ export async function ask(
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     signal?.throwIfAborted();
-    const response = await claude().beta.messages.create(
+    const response = await ai().beta.messages.create(
       {
         model: MODEL,
         max_tokens: 4000,
